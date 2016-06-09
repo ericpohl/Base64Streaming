@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 
 namespace Base64Streaming
@@ -7,7 +6,7 @@ namespace Base64Streaming
     public class Base64DecodingStream : Stream
     {
         private long _position;
-        private TextReader _base64TextReader;
+        private readonly TextReader _base64TextReader;
 
         public Base64DecodingStream(TextReader base64TextReader)
         {
@@ -58,15 +57,30 @@ namespace Base64Streaming
             while (pos < offset + innerCount)
             {
                 int charsRead = _base64TextReader.Read(textBuffer, 0, 4);
+                if (charsRead == 0)
+                {
+                    // End of the input reader
+                    break;
+                }
+
+                if (charsRead == 1)
+                {
+                    throw new FormatException("Invalid length for Base-64 character stream");
+                }
+
                 if (charsRead < 4)
                 {
-                    Debug.Print("We're at the end...");
-                    break;
+                    // If we're at the end but missing characters, so assume these should be pad characters
+                    for (int k = charsRead; k < 4; k++)
+                    {
+                        textBuffer[k] = '=';
+                    }
                 }
 
                 for (int k = 0; k < 4; k++)
                 {
-                    // TODO: optimize this by doing ASCII math instead of IndexOf()
+                    // TODO: optimize this by doing ASCII math instead of IndexOf().
+                    // See ValueFromChar() vs. ValueFromChar2() below
                     b[k] = Codes.IndexOf(textBuffer[k]);
                 }
 
@@ -81,9 +95,80 @@ namespace Base64Streaming
                 }
             }
 
-            var retval = pos - offset;
+            var bytesReturnedCount = pos - offset;
+            _position += bytesReturnedCount;
 
-            return retval;
+            return bytesReturnedCount;
+        }
+
+        public static int ValueFromChar(char c)
+        {
+            return Codes.IndexOf(c);
+        }
+
+        public static uint ValueFromChar2(uint currCode)
+        {
+            unchecked
+            {
+                const uint intA = (uint)'A';
+                const uint inta = (uint)'a';
+                const uint int0 = (uint)'0';
+                const uint intEq = (uint)'=';
+                const uint intPlus = (uint)'+';
+                const uint intSlash = (uint)'/';
+                const uint intSpace = (uint)' ';
+                const uint intTab = (uint)'\t';
+                const uint intNLn = (uint)'\n';
+                const uint intCRt = (uint)'\r';
+                const uint intAtoZ = (uint)('Z' - 'A');  // = ('z' - 'a')
+                const uint int0to9 = (uint)('9' - '0');
+
+                if (currCode - intA <= intAtoZ)
+                    currCode -= intA;
+
+                else if (currCode - inta <= intAtoZ)
+                    currCode -= (inta - 26u);
+
+                else if (currCode - int0 <= int0to9)
+                    currCode -= (int0 - 52u);
+
+                else
+                {
+                    // Use the slower switch for less common cases:
+                    switch (currCode)
+                    {
+                        // Significant chars:
+                        case intPlus:
+                            currCode = 62u;
+                            break;
+
+                        case intSlash:
+                            currCode = 63u;
+                            break;
+
+                        case intEq:
+                            currCode = 64u;
+                            break;
+
+                        // Legal no-value chars (we ignore these):
+                        case intCRt:
+                        case intNLn:
+                        case intSpace:
+                        case intTab:
+                            currCode = 65u;
+                            break;
+
+                        // The equality char is only legal at the end of the input.
+                        // Jump after the loop to make it easier for the JIT register predictor to do a good job for the loop itself:
+
+                        // Other chars are illegal:
+                        default:
+                            throw new FormatException("Format_BadBase64Char");
+                    }
+                }
+
+                return currCode;
+            }
         }
 
         public override void Flush()

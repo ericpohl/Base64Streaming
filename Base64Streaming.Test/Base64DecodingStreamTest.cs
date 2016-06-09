@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using NUnit.Framework;
 
 namespace Base64Streaming.Test
@@ -62,7 +59,63 @@ namespace Base64Streaming.Test
             }
         }
 
+        [TestCase("Zg", "f")]
+        [TestCase("Zm8", "fo")]
+        [TestCase("Zm9vYg", "foob")]
+        [TestCase("Zm9vYmE", "fooba")]
+        [Test]
+        public void MissingPadChars(string input, string expectedOutput)
+        {
+            using (var inputReader = new StringReader(input))
+            {
+                using (var decodedStream = new Base64DecodingStream(inputReader))
+                {
+                    Assert.AreEqual(expectedOutput, decodedStream.AsString(Encoding.UTF8));
+                }
+            }
+        }
 
+        [Test]
+        public void OneExtraCharacter_ThrowsFormatException()
+        {
+            using (var inputReader = new StringReader("Zm9vY"))
+            {
+                using (var decodedStream = new Base64DecodingStream(inputReader))
+                {
+                    Assert.Throws<FormatException>(() => Console.WriteLine(decodedStream.AsString(Encoding.UTF8)));
+                }
+            }
+        }
+
+        [TestCase('A', 0)]
+        [TestCase('Z', 25)]
+        [TestCase('a', 26)]
+        [TestCase('z', 51)]
+        [TestCase('0', 52)]
+        [TestCase('9', 61)]
+        [TestCase('+', 62)]
+        [TestCase('/', 63)]
+        [TestCase('=', 64)]
+        [Test]
+        public void ValueFromChar(char c, int expected)
+        {
+            Assert.AreEqual(expected, Base64DecodingStream.ValueFromChar(c));
+        }
+
+        [TestCase('A', 0u)]
+        [TestCase('Z', 25u)]
+        [TestCase('a', 26u)]
+        [TestCase('z', 51u)]
+        [TestCase('0', 52u)]
+        [TestCase('9', 61u)]
+        [TestCase('+', 62u)]
+        [TestCase('/', 63u)]
+        [TestCase('=', 64u)]
+        [Test]
+        public void ValueFromChar2(char c, UInt32 expected)
+        {
+            Assert.AreEqual(expected, Base64DecodingStream.ValueFromChar2((uint)c));
+        }
 
         // TODO: Handle whitespace
     }
