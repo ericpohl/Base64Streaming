@@ -8,7 +8,7 @@ namespace Base64Streaming
         static void Main(string[] args)
         {
             string xmlblob =
-                File.ReadAllText(@"C:\Users\epohl.SRC_CORPORATE\Dropbox\projects\Base64Streaming\XmlBlob.xml");
+                File.ReadAllText(@"C:\Users\epohl\Dropbox\projects\Base64Streaming\XmlBlob.xml");
 
             CompiledDocumentReferences references = XmlBlobHelper.GetCompiledDocumentReferences(xmlblob);
             Console.WriteLine("references: categoryId = {0}, parentId = {1}, dapId = {2}",

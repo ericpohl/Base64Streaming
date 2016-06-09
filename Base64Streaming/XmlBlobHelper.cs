@@ -41,18 +41,27 @@ namespace Base64Streaming
                 throw new Exception("Outer CDATA not found");
             }
 
-            // It would still be nice to have a Base64DecodingStream that took a string or textwriter and did this in one step.
-            using (Stream encodedStream = new TextEncodingStream(outerCdata))
+            using (Stream base64DecodedStream = new Base64DecodingStream(new StringReader(outerCdata)))
             {
-                using (var base64DecodedStream = new CryptoStream(encodedStream, new FromBase64Transform(), CryptoStreamMode.Read))
+                using (TextReader compiledDocumentTextReader = new StreamReader(base64DecodedStream, Encoding.Default))
                 {
-                    using (TextReader compiledDocumentTextReader = new StreamReader(base64DecodedStream, Encoding.Default))
-                    {
-                        CompiledDocumentReferences references = GetCompiledDocumentReferencesFromCompiledDocument(compiledDocumentTextReader);
-                        return references;
-                    }
+                    CompiledDocumentReferences references = GetCompiledDocumentReferencesFromCompiledDocument(compiledDocumentTextReader);
+                    return references;
                 }
             }
+
+            // It would still be nice to have a Base64DecodingStream that took a string or textwriter and did this in one step.
+            //using (Stream encodedStream = new TextEncodingStream(outerCdata))
+            //{
+            //    using (var base64DecodedStream = new CryptoStream(encodedStream, new FromBase64Transform(), CryptoStreamMode.Read))
+            //    {
+            //        using (TextReader compiledDocumentTextReader = new StreamReader(base64DecodedStream, Encoding.Default))
+            //        {
+            //            CompiledDocumentReferences references = GetCompiledDocumentReferencesFromCompiledDocument(compiledDocumentTextReader);
+            //            return references;
+            //        }
+            //    }
+            //}
         }
 
         private static CompiledDocumentReferences GetCompiledDocumentReferencesFromCompiledDocument(TextReader textReader)
