@@ -56,7 +56,8 @@ namespace Base64Streaming
             int innerCount = (count/3)*3;
             while (pos < offset + innerCount)
             {
-                int charsRead = _base64TextReader.Read(textBuffer, 0, 4);
+                // TODO: We might want to inline the ReadCharacterQuartet method for efficiency
+                int charsRead = ReadCharacterQuartet(_base64TextReader, textBuffer);
                 if (charsRead == 0)
                 {
                     // End of the input reader
@@ -96,9 +97,61 @@ namespace Base64Streaming
             }
 
             var bytesReturnedCount = pos - offset;
+
+            // TODO: add unit tests to verify Position
             _position += bytesReturnedCount;
 
             return bytesReturnedCount;
+        }
+
+        /// <summary>
+        /// Reads four characters from the base64 input textreader, skipping whitespace
+        /// </summary>
+        /// <param name="textReader"></param>
+        /// <param name="textBuffer"></param>
+        /// <returns></returns>
+        public static int ReadCharacterQuartet(TextReader textReader, char[] textBuffer)
+        {
+            // TODO: this should be unchecked right here if this is public at all
+            int charsRead = textReader.Read(textBuffer, 0, 4);
+            if (charsRead == 0)
+            {
+                // End of the input reader
+                return 0;
+            }
+
+            int nonWhitespaceCharsRead = charsRead;
+            for (int j = charsRead - 1; j >= 0; j--)
+            {
+                if (char.IsWhiteSpace(textBuffer[j]))
+                {
+                    nonWhitespaceCharsRead--;
+                    // Shift bytes down
+                    for (int k = j; k < charsRead-1; k++)
+                    {
+                        textBuffer[k] = textBuffer[k + 1];
+                    }
+                }
+            }
+
+            // Read more characters if needed
+            for (int j = nonWhitespaceCharsRead; j < 4; )
+            {
+                int c = textReader.Read();
+                if (c == -1)
+                {
+                    // Reached end of textreader
+                    break;
+                }
+
+                if (!char.IsWhiteSpace((char) c))
+                {
+                    textBuffer[j++] = (char) c;
+                    nonWhitespaceCharsRead++;
+                }
+            }
+
+            return nonWhitespaceCharsRead;
         }
 
         public static int ValueFromChar(char c)
@@ -146,6 +199,7 @@ namespace Base64Streaming
                             currCode = 63u;
                             break;
 
+                        // The equality char is only legal at the end of the input.
                         case intEq:
                             currCode = 64u;
                             break;
@@ -157,9 +211,6 @@ namespace Base64Streaming
                         case intTab:
                             currCode = 65u;
                             break;
-
-                        // The equality char is only legal at the end of the input.
-                        // Jump after the loop to make it easier for the JIT register predictor to do a good job for the loop itself:
 
                         // Other chars are illegal:
                         default:

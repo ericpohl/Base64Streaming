@@ -11,12 +11,14 @@ namespace Base64Streaming.Test
         [Test]
         [TestCase("The quick brown fox jumped over the lazy dog.")]
         [TestCase("The quick brown fox jumped over the lazy dog")]
-        [TestCase("Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, exceeds the short vehemence of any carnal pleasure.")]
+        [TestCase(
+            "Man is distinguished, not only by his reason, but by this singular passion from other animals, which is a lust of the mind, that by a perseverance of delight in the continued and indefatigable generation of knowledge, exceeds the short vehemence of any carnal pleasure."
+            )]
         public void Test1(string expected)
         {
             byte[] bytes = Encoding.UTF8.GetBytes(expected);
             string base64 = Convert.ToBase64String(bytes);
-            
+
             Console.WriteLine("{0} => {1}", expected, base64);
             var textReader = new StringReader(base64);
             using (var stream = new Base64DecodingStream(textReader))
@@ -112,11 +114,113 @@ namespace Base64Streaming.Test
         [TestCase('/', 63u)]
         [TestCase('=', 64u)]
         [Test]
-        public void ValueFromChar2(char c, UInt32 expected)
+        public void ValueFromChar2(char c, uint expected)
         {
-            Assert.AreEqual(expected, Base64DecodingStream.ValueFromChar2((uint)c));
+            Assert.AreEqual(expected, Base64DecodingStream.ValueFromChar2((uint) c));
         }
 
-        // TODO: Handle whitespace
+        [Test]
+        public void ReadCharacterQuartet_Empty()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader(""))
+            {
+                Assert.AreEqual(0, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                for (int i = 0; i < 4; i++)
+                {
+                    Assert.AreEqual(0, buffer[i]);
+                }
+            }
+        }
+
+        [Test]
+        public void ReadCharacterQuartet_Full()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader("fred"))
+            {
+                Assert.AreEqual(4, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                CollectionAssert.AreEqual("fred", buffer);
+            }
+        }
+
+        [Test]
+        public void ReadCharacterQuartet_WhitespaceAtBeginning()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader(" fred"))
+            {
+                Assert.AreEqual(4, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                CollectionAssert.AreEqual("fred", buffer);
+            }
+        }
+
+        [Test]
+        public void ReadCharacterQuartet_TwoWhitespaceAtBeginning()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader("  fred"))
+            {
+                Assert.AreEqual(4, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                CollectionAssert.AreEqual("fred", buffer);
+            }
+        }
+
+        [Test]
+        public void ReadCharacterQuartet_FourWhitespaceAtBeginning()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader("    fred"))
+            {
+                Assert.AreEqual(4, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                CollectionAssert.AreEqual("fred", buffer);
+            }
+        }
+
+        [Test]
+        public void ReadCharacterQuartet_TwoWhitespaceInMiddle()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader("fr  ed"))
+            {
+                Assert.AreEqual(4, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                CollectionAssert.AreEqual("fred", buffer);
+            }
+        }
+
+        [Test]
+        public void ReadCharacterQuartet_InterspersedWhitespace()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader(" f r e d "))
+            {
+                Assert.AreEqual(4, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                CollectionAssert.AreEqual("fred", buffer);
+            }
+        }
+
+        [Test]
+        public void ReadCharacterQuartet_IncompleteQuartet()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader("fr"))
+            {
+                Assert.AreEqual(2, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                Assert.AreEqual('f', buffer[0]);
+                Assert.AreEqual('r', buffer[1]);
+            }
+        }
+
+        [Test]
+        public void ReadCharacterQuartet_IncompleteQuartetAndWhitespaceAtEnd()
+        {
+            char[] buffer = new char[4];
+            using (var inputReader = new StringReader("fr  "))
+            {
+                Assert.AreEqual(2, Base64DecodingStream.ReadCharacterQuartet(inputReader, buffer));
+                Assert.AreEqual('f', buffer[0]);
+                Assert.AreEqual('r', buffer[1]);
+            }
+        }
     }
 }
